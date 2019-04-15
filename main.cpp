@@ -1,5 +1,8 @@
 #include <iostream>
 #include <fstream>
+#include <string>
+#include <unordered_set>
+#include <utility>
 #include <stdio.h>
 #include <stdlib.h>
 #include <queue>
@@ -13,7 +16,54 @@
 const int defaultEfConstruction = 1024;
 const int defaultEfSearch = 128;
 const int defaultM = 32;
-const int defaultTopK = 1;
+const int defaultTopK = 10;
+
+
+int loadFvecs(float*& data, int numItems, std::string inputPath) {
+    std::ifstream fin(inputPath, std::ios::binary);
+    if (!fin) {
+        std::cout << "cannot open file " << inputPath << std::endl;
+        assert(false);
+    }
+    int dimension;
+    fin.read((char*)&dimension, 4);
+    data = new float[numItems* dimension];
+    fin.read((char*)data, sizeof(float) * dimension);
+
+    int dim;
+    for (int i = 1; i < numItems; ++i) {
+        fin.read((char*)&dim, 4);
+        assert(dim == dimension);
+        fin.read((char*)(data + i * dimension), sizeof(float) * dimension);
+    }
+    fin.close();
+    return dimension;
+}
+
+std::vector<std::priority_queue<std::pair<float, labeltype >>> loadLSHBOX(std::string inputPath) {
+    std::vector<std::priority_queue<std::pair<float, labeltype >>> answers;
+
+    std::ifstream fin(inputPath.c_str());
+    unsigned numQueries;
+    unsigned K;
+    fin >> numQueries >> K;
+    answers.resize(numQueries);
+
+    unsigned qId;
+    unsigned id;
+    float dist;
+    int index = 0;
+    for (int q = 0; q < numQueries; ++q) {
+        fin >> qId;
+        assert(qId == q);
+        for (int i = 0; i < K; ++i) {
+            fin >> id >> dist;
+            answers[q].emplace(dist, id);
+        }
+    }
+    fin.close();
+    return answers;
+}
 
 void printHelpMessage()
 {
@@ -72,6 +122,7 @@ int main(int argc, char** argv) {
     int topK = defaultTopK;
     std::string dataname;
     std::string queryname;
+    std::string benchmarkname;
 
     hnswlib::HierarchicalNSW<float> *appr_alg;
     
@@ -105,19 +156,9 @@ int main(int argc, char** argv) {
     if (mode == "database") {
         for (int i = 1; i < argc - 1; i++) {
             if (std::string(argv[i]) == "--d" || std::string(argv[i]) == "--data" || std::string(argv[i]) == "--database") {
-                input.open(argv[i + 1], std::ios::binary);
-                if (!input.is_open()) {
-                    printError("Cannot open file \"" + std::string(argv[i + 1]) + "\"");
-                    return 0;
-                } else {
-                    dataname = std::string(argv[i + 1]);
-                }
+                dataname = std::string(argv[i + 1]);
                 break;
             }
-        }
-        if (!input.is_open()) {
-            printError("Database file was not specified");
-            return 0;
         }
         std::cout << "Database file: " << dataname << std::endl;
 
@@ -201,11 +242,11 @@ int main(int argc, char** argv) {
 
        
         hnswlib::L2Space l2space(vecdim);
-        float *mass = new float[vecsize * vecdim];
-        input.read((char *)mass, vecsize * vecdim * sizeof(float));
-        input.close();
-        
+        float *mass = NULL;
+        size_t datadim = loadFvecs(mass, vecsize, dataname);
+
         appr_alg = new hnswlib::HierarchicalNSW<float>(&l2space, vecsize, M, efConstruction);
+
         std::cout << "Building index\n";
         double t1 = omp_get_wtime();
         for (int i = 0; i < 1; i++) {
@@ -224,22 +265,19 @@ int main(int argc, char** argv) {
     } else {
         for (int i = 1; i < argc - 1; i++) {
             if (std::string(argv[i]) == "--q" || std::string(argv[i]) == "--query") {
-                inputQ.open(argv[i + 1], std::ios::binary);
-                if (!inputQ.is_open()) {
-                    printError("Cannot open file \"" + std::string(argv[i + 1]) + "\"");
-                    return 0;
-                } else {
-                    queryname = std::string(argv[i + 1]);
-                }
+                queryname = std::string(argv[i + 1]);
                 break;
             }
         }
-        if (!inputQ.is_open()) {
-            printError("Query file was not specified");
-            return 0;
-        }
         std::cout << "Query filename: " << queryname << std::endl;
 
+        for (int i = 1; i < argc - 1; i++) {
+            if (std::string(argv[i]) == "--benchmark") {
+                benchmarkname = std::string(argv[i + 1]);
+                break;
+            }
+        }
+        std::cout << "benchmark filename: " << benchmarkname << std::endl;
 
 
         for (int i = 1; i < argc - 1; i++) {
@@ -335,52 +373,92 @@ int main(int argc, char** argv) {
         }
 
 
-
+        std::vector<std::priority_queue<std::pair<float, labeltype >>> answers = loadLSHBOX(benchmarkname);
 
 
         hnswlib::L2Space l2space(vecdim);
-        float *massQ = new float[qsize * vecdim];
-        inputQ.read((char *)massQ, qsize * vecdim * sizeof(float));
-        inputQ.close();
+        float *massQ = NULL;
+        size_t datadim = loadFvecs(massQ, qsize, queryname);
 
         std::priority_queue< std::pair< float, labeltype >> gt[qsize];
-		
+
         appr_alg = new hnswlib::HierarchicalNSW<float>(&l2space, graphname.data(), false);
-        appr_alg->setEf(efSearch);
-        std::ofstream fres;
-        if (!outputname.empty()) {
-            fres.open(outputname);
+
+        std::cout << "max level : " << appr_alg->maxlevel_ << std::endl;
+        std::vector<int> efs;
+        for (int i = 10; i < 100; i+=10) {
+            efs.push_back(i);
         }
-       
-        auto start = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < qsize; i++) {
-            gt[i] = appr_alg->searchKnn(massQ + vecdim*i, topK);
+        for (int i = 100; i < 300; i += 20) {
+            efs.push_back(i);
         }
-        auto end = std::chrono::high_resolution_clock::now();
-        for (int i = 0; i < qsize; i++) {
-            std::vector <int> res;
-            while (!gt[i].empty()) {
-                res.push_back(gt[i].top().second);
-                gt[i].pop();
+        for (int i = 300; i < 1000; i += 100) {
+            efs.push_back(i);
+        }
+        for (int i = 2000; i < 20000; i += 2000) {
+            efs.push_back(i);
+        }
+        //for (int i = 20000; i < 100000; i += 20000) {
+        //    efs.push_back(i);
+        //}
+
+        for (int efSearch : efs) {
+            appr_alg->setEf(efSearch);
+            appr_alg->dist_calc = 0;
+            std::ofstream fres;
+            if (!outputname.empty()) {
+                fres.open(outputname);
             }
-            std::reverse(res.begin(), res.end());
-            for (auto it: res) {
+
+            auto start = std::chrono::high_resolution_clock::now();
+            for (int i = 0; i < qsize; i++) {
+                gt[i] = appr_alg->searchKnn(massQ + vecdim*i, topK);
+            }
+            auto end = std::chrono::high_resolution_clock::now();
+            // std::cout << "quality : " << appr_alg->quality_of_first_bot_bucket / qsize << std::endl;
+
+            int correct = 0, total = 0;
+
+            for (int i = 0; i < qsize; i++) {
+                std::vector <int> res;
+                while (!gt[i].empty()) {
+                    res.push_back(gt[i].top().second);
+                    gt[i].pop();
+                }
+                std::reverse(res.begin(), res.end());
+
+                std::unordered_set<labeltype> g;
+                std::priority_queue<std::pair<float, labeltype >> gt(answers[i]);
+                total += gt.size();
+                while (gt.size()) {
+                    g.insert(gt.top().second);
+                    gt.pop();
+                }
+                for (auto it : res) {
+                    // to be done soon
+                    if (g.find(it) != g.end())
+                        correct++;
+
+                    if (!outputname.empty()) {
+                        fres << it << ' ';
+                    } else {
+                        std::cout << it << ' ';
+                    }
+                }
                 if (!outputname.empty()) {
-                    fres << it << ' ';
+                    fres << std::endl;
                 } else {
-                    std::cout << it << ' ';
+                    std::cout << std::endl;
                 }
             }
             if (!outputname.empty()) {
-                fres << std::endl;
-            } else {
-                std::cout << std::endl;
+                fres.close();
             }
+            std::cout << "ef : " << efSearch << ", ";
+            std::cout << 1.0f * correct / total << ", ";
+            std::cout << "Average query time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << "ms, ";
+            std::cout << "dist_computations: " << appr_alg->dist_calc / (double)qsize << std::endl;
         }
-        if (!outputname.empty()) {
-            fres.close();
-        }
-        std::cout << "Average query time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << "ms" << std::endl;
         delete appr_alg;
         delete massQ;
     }
