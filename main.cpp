@@ -124,6 +124,9 @@ int main(int argc, char** argv) {
     std::string queryname;
     std::string benchmarkname;
 
+    // for verify the significance of finding topk angular NNS
+    std::string angularbenchmarkname;
+
     hnswlib::HierarchicalNSW<float> *appr_alg;
     
     for (int i = 1; i < argc; i++) {
@@ -245,7 +248,26 @@ int main(int argc, char** argv) {
         float *mass = NULL;
         size_t datadim = loadFvecs(mass, vecsize, dataname);
 
+        //  calculate norms for angular queue   ---- jie 2019-01-14
+        std::vector<float> element_norms;
+        element_norms.reserve(vecsize);
+        for (int i = 0; i < vecsize; ++i) {
+            float line_norm = 0;
+            for (int j = 0; j < vecdim; ++j) {
+                float ele = mass[i * vecdim + j];
+                line_norm += ele * ele;
+            }
+            line_norm = sqrt(line_norm);
+            element_norms.push_back(line_norm);
+        }
+		
         appr_alg = new hnswlib::HierarchicalNSW<float>(&l2space, vecsize, M, efConstruction);
+
+        appr_alg->elementNorms = std::move(element_norms);
+        std::cout << "testing " << std::endl;
+        for (int i = 0; i < 3; ++i) {
+            std::cout << appr_alg->elementNorms[i] << std::endl;
+        }
 
         std::cout << "Building index\n";
         double t1 = omp_get_wtime();
@@ -257,6 +279,14 @@ int main(int argc, char** argv) {
             appr_alg->addPoint((void *)(mass + vecdim*i), (size_t)i);
         }
         double t2 = omp_get_wtime();
+
+        // test if cos graph is correct   jie 0506
+        /*
+        for (int i = 0; i < 10; ++i) {
+          int *temp_data = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_ + appr_alg->size_links_level0_ / 2);
+          std::cout << "construction # links: " << *temp_data << std::endl;
+        }
+        */
  
         std::cout << "Index built, time=" << t2 - t1 << " s" << "\n";
         appr_alg->SaveIndex(graphname.data());
@@ -279,6 +309,13 @@ int main(int argc, char** argv) {
         }
         std::cout << "benchmark filename: " << benchmarkname << std::endl;
 
+        for (int i = 1; i < argc - 1; i++) {
+            if (std::string(argv[i]) == "--benchmark2") {
+                angularbenchmarkname = std::string(argv[i + 1]);
+                break;
+            }
+        }
+        std::cout << "angular benchmark filename: " << angularbenchmarkname << std::endl;
 
         for (int i = 1; i < argc - 1; i++) {
             if (std::string(argv[i]) == "--querySize" || std::string(argv[i]) == "--qSize") {
@@ -384,8 +421,79 @@ int main(int argc, char** argv) {
 
         appr_alg = new hnswlib::HierarchicalNSW<float>(&l2space, graphname.data(), false);
 
+        appr_alg->size_links_level0_ = appr_alg->offsetData_;
+        std::cout << "422 line error found: " << appr_alg->size_links_level0_ << std::endl;
+
+        /*
+        for (int i = 100000; i < 100010; ++i) {
+          int *temp_data = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_ + appr_alg->size_links_level0_ / 2);
+          std::cout << "number of links : " << *temp_data << std::endl;
+        }
+        */
+        
+        // construct a map between external_id and internal_id
+        /*
+        std::vector<int> external_internal_map(appr_alg->maxelements_);
+        for (int i = 0; i < appr_alg->maxelements_; ++i) {
+            external_internal_map[appr_alg->getExternalLabel(i)] = i;
+        }
+        */
+
+        /*
+        std::vector<std::priority_queue<std::pair<float, labeltype >>> angular_answers = loadLSHBOX(angularbenchmarkname);
+
+        std::unordered_set<int> temp_set;
+        int *temp_data = NULL;
+
+        for (int i = 0; i < qsize; ++i) {
+            std::priority_queue<std::pair<float, labeltype >> angular_gt(angular_answers[i]);
+            while (angular_gt.size()) {
+                int neighbor_id = angular_gt.top().second;
+                temp_set.insert(neighbor_id);
+                temp_data = (int *)(appr_alg->data_level0_memory_ + external_internal_map[neighbor_id] * appr_alg->size_data_per_element_);
+                int size = *temp_data;
+                for (int j = 1; j <= size; j++) {
+                  neighbor_id = *(temp_data + j);
+                  temp_set.insert(appr_alg->getExternalLabel(neighbor_id));
+                }
+                angular_gt.pop();
+            }
+            std::vector<int> temp_vec(temp_set.size());
+            std::copy(temp_set.begin(), temp_set.end(), temp_vec.begin());
+            appr_alg->candidates_by_cos_topk.push_back(std::move(temp_vec));
+            temp_set.clear();
+        }
+        */
+        // ===================================================================
+
+        // =========== very important here ========================================================================================================
+        /*
+        std::vector<int> external_count(appr_alg->maxelements_);
+        int *temp_data = NULL;
+        int degree_count = 0;
+        for (int i = 0; i < appr_alg->maxelements_; ++i) {
+            temp_data = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_);
+            int degree = *temp_data;
+            for (int j = 1; j <= degree; ++j) {
+                external_count[appr_alg->getExternalLabel(*(temp_data + j))]++;
+            }
+            degree_count += degree;
+            // std::cout << "norm : " << norm << ", degrees : " << degree  << std::endl;
+            // std::cout << norm << ", " << degree  << std::endl;
+        }
+        std::cout << "avg. degree = " << (float)degree_count / appr_alg->maxelements_  << std::endl;
+        for (int i = 0; i < appr_alg->maxelements_; ++i) {
+            float norm = appr_alg->elementNorms[appr_alg->getExternalLabel(i)];
+            std::cout << norm << ", " << external_count[appr_alg->getExternalLabel(i)] << std::endl;
+        }
+        */
+        // ========================================================================================================================================
+
+
         std::cout << "max level : " << appr_alg->maxlevel_ << std::endl;
         std::vector<int> efs;
+
+        // efs.push_back(100);
         for (int i = 10; i < 100; i+=10) {
             efs.push_back(i);
         }
@@ -413,11 +521,14 @@ int main(int argc, char** argv) {
             auto start = std::chrono::high_resolution_clock::now();
             for (int i = 0; i < qsize; i++) {
                 gt[i] = appr_alg->searchKnn(massQ + vecdim*i, topK);
+                // std::cout << "test 0505 : " << gt[i].size() << std::endl;
             }
             auto end = std::chrono::high_resolution_clock::now();
             // std::cout << "quality : " << appr_alg->quality_of_first_bot_bucket / qsize << std::endl;
 
             int correct = 0, total = 0;
+            // jie 2019-04-15
+            // int test_correct = 0, test_avg = 0;
 
             for (int i = 0; i < qsize; i++) {
                 std::vector <int> res;
@@ -445,6 +556,17 @@ int main(int argc, char** argv) {
                         std::cout << it << ' ';
                     }
                 }
+                
+                // jie ===============================================
+                /*
+                test_avg += (appr_alg->candidates_by_cos_topk)[i].size();
+                for (auto it : appr_alg->candidates_by_cos_topk[i]) {
+                    if (g.find(it) != g.end())
+                        test_correct++;
+                }
+                */
+                // ====================================================
+                
                 if (!outputname.empty()) {
                     fres << std::endl;
                 } else {
@@ -458,6 +580,12 @@ int main(int argc, char** argv) {
             std::cout << 1.0f * correct / total << ", ";
             std::cout << "Average query time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << "ms, ";
             std::cout << "dist_computations: " << appr_alg->dist_calc / (double)qsize << std::endl;
+            // jie 2019-04-15 
+            /*
+            std::cout << "avg # of candidates : " << test_avg / (double)qsize << ", ";
+            std::cout << 1.0f * test_correct / total << std::endl;
+            std::cout << 1.0f * total / qsize << std::endl;
+            */
         }
         delete appr_alg;
         delete massQ;
