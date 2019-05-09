@@ -47,11 +47,17 @@ namespace hnswlib {
       efConstruction_ = efConstruction;
       ef_ = 7;
 
+      cos_M_ = 10;
+      cos_maxM_ = cos_M_;
+      cos_maxM0_ = 2 * cos_M_;
+
 
       // jie 05-02
       // note that the ip links will be put in the first half
       // and cos links will be put in the second half
-      size_links_level0_ = 2 * (maxM0_ * sizeof(tableint) + sizeof(linklistsizeint));
+      size_links_level0_ip_ = maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
+      size_links_level0_cos_ = cos_maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
+      size_links_level0_ = size_links_level0_ip_ + size_links_level0_cos_;
       size_data_per_element_ = size_links_level0_ + data_size_ + sizeof(labeltype);
       offsetData_ = size_links_level0_;
       label_offset_ = size_links_level0_ + data_size_;
@@ -74,7 +80,9 @@ namespace hnswlib {
       maxlevel_ = -1;
 
       linkLists_ = (char **)malloc(sizeof(void *) * maxelements_);
-      size_links_per_element_ = 2 * (maxM_ * sizeof(tableint) + sizeof(linklistsizeint));
+      size_links_upper_ip_ = maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
+      size_links_upper_cos_ = cos_maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
+      size_links_per_element_ = size_links_upper_ip_ + size_links_upper_cos_;
       mult_ = 1 / log(1.0 * M_);
       revSize_ = 1.0 / mult_;
     }
@@ -100,6 +108,15 @@ namespace hnswlib {
     int delaunay_type_;
     double mult_, revSize_;
     int maxlevel_;
+
+    //jie 0508
+    size_t cos_M_;
+    size_t cos_maxM_;
+    size_t cos_maxM0_;
+    size_t size_links_level0_ip_;
+    size_t size_links_level0_cos_;
+    size_t size_links_upper_ip_;
+    size_t size_links_upper_cos_;
 
 
     VisitedListPool *visitedlistpool;
@@ -259,9 +276,9 @@ namespace hnswlib {
 
         int *data;// = (int *)(linkList0_ + curNodeNum * size_links_per_element0_);
         if (layer == 0)
-          data = (int *)(data_level0_memory_ + curNodeNum * size_data_per_element_ + size_links_level0_ / 2);
+          data = (int *)(data_level0_memory_ + curNodeNum * size_data_per_element_ + size_links_level0_ip_);
         else
-          data = (int *)(linkLists_[curNodeNum] + (layer - 1) * size_links_per_element_ + size_links_per_element_ / 2);
+          data = (int *)(linkLists_[curNodeNum] + (layer - 1) * size_links_per_element_ + size_links_upper_ip_);
         int size = *data;
         tableint *datal = (tableint *)(data + 1);
         // ????? how to utilize thse prefetch command
@@ -346,16 +363,11 @@ namespace hnswlib {
         candidateSet.pop();
 
         tableint curNodeNum = curr_el_pair.second;
-        // need to change the following line jie 0505
         int *data = (int *)(data_level0_memory_ + curNodeNum * size_data_per_element_);
         if (!is_ip) {
-            data = (int *)(data_level0_memory_ + curNodeNum * size_data_per_element_ + size_links_level0_ / 2);
-            // std::cout << "line 351 check : " << size_links_level0_ / 2 << std::endl;
-            // std::cout << "line 352 check : " << *data << std::endl;
+            data = (int *)(data_level0_memory_ + curNodeNum * size_data_per_element_ + size_links_level0_ip_);
         }
         int size = *data;
-        // std::cout << "line 355 size: " << size << std::endl;
-        // std::cout << "hi : " << size << std::endl;
         // I am not sure how to modify mm_prefetch and whether I need to modify it
         _mm_prefetch((char *)(massVisited + *(data + 1)), _MM_HINT_T0);
         _mm_prefetch((char *)(massVisited + *(data + 1) + 64), _MM_HINT_T0);
@@ -373,8 +385,6 @@ namespace hnswlib {
             char *currObj1 = (getDataByInternalId(tnum));
             dist_t dist = fstdistfunc_(datapoint, currObj1, dist_func_param_);
             if (!is_ip) dist = dist / elementNorms[getExternalLabel(tnum)];
-            // dist_t cos = -dist / elementNorms[getExternalLabel(tnum)];
-            // no_pop_cosQueue.emplace(cos, tnum);
             dist_calc++;
             if (topResults.top().first > dist || topResults.size() < ef) {
               candidateSet.emplace(-dist, tnum);
@@ -446,9 +456,12 @@ namespace hnswlib {
         resultSet.pop();
         bool good = true;
 
-        float coeff = 1.0;
-        if (is_ip) coeff = 0.7;
+        // for now we do not apply any pruning strategies to mips graph
+        // we rely on cosgraph for pruning in the query phase
+        /*
+        if (!is_ip)
         {
+          float coeff = 1.0;
           for (std::pair< dist_t, tableint> curen2 : returnlist) {
             dist_t curdist =
               fstdistfunc_(getDataByInternalId(curen2.second), getDataByInternalId(curen.second), dist_func_param_);;
@@ -459,6 +472,7 @@ namespace hnswlib {
             }
           }
         }
+        */
         if (good) {
           returnlist.push_back(curen);
         }
@@ -481,13 +495,17 @@ namespace hnswlib {
     void mutuallyConnectNewElement(void *datapoint, tableint cur_c, std::priority_queue< std::pair< dist_t, tableint  >> topResults, int level, int is_ip) {
 
       size_t Mcurmax = level ? maxM_ : maxM0_;
-      getNeighborsByHeuristic2(topResults, M_, is_ip);
-      while (topResults.size() > M_) {
+      if (!is_ip) Mcurmax = level ? cos_maxM_ : cos_maxM0_;
+
+      size_t num_links = is_ip ? M_ : cos_M_;
+
+      getNeighborsByHeuristic2(topResults, num_links, is_ip);
+      while (topResults.size() > num_links) {
         throw exception();
         topResults.pop();
       }
       vector<tableint> rez;
-      rez.reserve(M_);
+      rez.reserve(num_links);
       while (topResults.size() > 0) {
         rez.push_back(topResults.top().second);
         topResults.pop();
@@ -498,14 +516,17 @@ namespace hnswlib {
           if (is_ip == 1)
             ll_cur = (linklistsizeint *)(data_level0_memory_ + cur_c * size_data_per_element_);
           else
-            ll_cur = (linklistsizeint *)(data_level0_memory_ + cur_c * size_data_per_element_ + size_links_level0_ / 2);
+            ll_cur = (linklistsizeint *)(data_level0_memory_ + cur_c * size_data_per_element_ + size_links_level0_ip_);
         }
         else {
           if (is_ip == 1)
             ll_cur = (linklistsizeint *)(linkLists_[cur_c] + (level - 1) * size_links_per_element_);
           else
-            ll_cur = (linklistsizeint *)(linkLists_[cur_c] + (level - 1) * size_links_per_element_ + size_links_per_element_ / 2);
+            ll_cur = (linklistsizeint *)(linkLists_[cur_c] + (level - 1) * size_links_per_element_ + size_links_upper_ip_);
         }
+        // this is where error happens 0508
+        linklistsizeint test = *ll_cur;
+        int test_level = elementLevels[cur_c];
         if (*ll_cur) {
           cout << *ll_cur << "\n";
           cout << elementLevels[cur_c] << "\n";
@@ -517,8 +538,9 @@ namespace hnswlib {
 
 
         for (int idx = 0; idx < rez.size(); idx++) {
-          if (data[idx])
-            throw runtime_error("Should be blank");
+          if (data[idx]) {
+            throw runtime_error("Should be blank");\
+          }
           if (level > elementLevels[rez[idx]])
             throw runtime_error("Bad level");
 
@@ -536,13 +558,13 @@ namespace hnswlib {
           if (is_ip == 1)
             ll_other = (linklistsizeint *)(data_level0_memory_ + rez[idx] * size_data_per_element_);
           else
-            ll_other = (linklistsizeint *)(data_level0_memory_ + rez[idx] * size_data_per_element_ + size_links_level0_ / 2);
+            ll_other = (linklistsizeint *)(data_level0_memory_ + rez[idx] * size_data_per_element_ + size_links_level0_ip_);
         }
         else {
           if (is_ip == 1)
             ll_other = (linklistsizeint *)(linkLists_[rez[idx]] + (level - 1) * size_links_per_element_);
           else
-            ll_other = (linklistsizeint *)(linkLists_[rez[idx]] + (level - 1) * size_links_per_element_ + size_links_per_element_ / 2);
+            ll_other = (linklistsizeint *)(linkLists_[rez[idx]] + (level - 1) * size_links_per_element_ + size_links_upper_ip_);
         }
         
         if (level > elementLevels[rez[idx]])
@@ -684,7 +706,7 @@ namespace hnswlib {
               changed = false;
               int *data;
               unique_lock<mutex> lock(ll_locks[cos_currObj]);
-              data = (int *)(linkLists_[cos_currObj] + (level - 1) * size_links_per_element_ + size_links_per_element_ / 2);
+              data = (int *)(linkLists_[cos_currObj] + (level - 1) * size_links_per_element_ + size_links_upper_ip_);
               int size = *data;
               tableint *datal = (tableint *)(data + 1);
               for (int i = 0; i < size; i++) {
@@ -713,7 +735,8 @@ namespace hnswlib {
           std::priority_queue< std::pair< dist_t, tableint >> cos_topResults;
           searchBaseLayer(currObj, cos_currObj, datapoint, level, topResults, cos_topResults);
           // test if cos_topResults is what we expected
-          // std::cout << "705 line cos queue size :" << cos_topResults.size() << std::endl;
+          // std::cout << "level " << level << std::endl;
+
           // consider updating the currObj
           // currObj = topResults.top().second
           // maybe updating leads to better performance, maybe not. But it's worth a trial
@@ -750,13 +773,11 @@ namespace hnswlib {
         while (changed) {
           changed = false;
           int *data;
-          data = (int *)(linkLists_[cos_currObj] + (level - 1) * size_links_per_element_ + size_links_per_element_ / 2);
+          data = (int *)(linkLists_[cos_currObj] + (level - 1) * size_links_per_element_ + size_links_upper_ip_);
           int size = *data;
           tableint *datal = (tableint *)(data + 1);
           for (int i = 0; i < size; i++) {
             tableint cand = datal[i];
-            // jie
-            // if (i == 0) std::cout << "check neighbors " << cand << std::endl;
             if (cand<0 || cand>maxelements_)
               throw runtime_error("cand error");
             dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_) / elementNorms[getExternalLabel(cand)];
@@ -800,7 +821,7 @@ namespace hnswlib {
       std::set<tableint> cos_ep_set, ep_set;
       cos_ep_set.insert(cos_currObj);
       // cos queue is hardcoded to 10 for the time being
-      std::priority_queue< std::pair< dist_t, tableint  >, vector<pair<dist_t, tableint>>, CompareByFirst> cos_topResults = searchBaseLayerST(cos_ep_set, query_data, 10, 0);
+      std::priority_queue< std::pair< dist_t, tableint  >, vector<pair<dist_t, tableint>>, CompareByFirst> cos_topResults = searchBaseLayerST(cos_ep_set, query_data, 2, 0);
       while (cos_topResults.size() > 0) {
         tableint *data = (tableint*)(data_level0_memory_ + cos_topResults.top().second * size_data_per_element_);
         tableint size = *data;
@@ -810,6 +831,7 @@ namespace hnswlib {
         }
         cos_topResults.pop();
       }
+      // std::cout << "line 804 ep_set size, " << ep_set.size() << std::endl;
       std::priority_queue< std::pair< dist_t, tableint  >, vector<pair<dist_t, tableint>>, CompareByFirst> topResults = searchBaseLayerST(ep_set, query_data, ef_, 1);
       std::priority_queue< std::pair< dist_t, labeltype >> results;
       while (topResults.size() > k) {
@@ -878,6 +900,8 @@ namespace hnswlib {
       writeBinaryPOD(output, mult_);
       writeBinaryPOD(output, efConstruction_);
 
+      writeBinaryPOD(output, cos_M_);
+
       for (size_t i = 0; i < maxelements_; i++) {
         writeBinaryPOD(output, elementNorms[i]);
       }
@@ -914,6 +938,9 @@ namespace hnswlib {
       readBinaryPOD(input, M_);
       readBinaryPOD(input, mult_);
       readBinaryPOD(input, efConstruction_);
+
+      readBinaryPOD(input, cos_M_);
+
       cout << efConstruction_ << "\n";
 
       for (size_t i = 0; i < maxelements_; i++) {
@@ -930,8 +957,16 @@ namespace hnswlib {
       data_level0_memory_ = (char *)malloc(maxelements_*size_data_per_element_);
       input.read(data_level0_memory_, maxelements_*size_data_per_element_);
 
+      // jie 0508
+      cos_maxM_ = cos_M_;
+      cos_maxM0_ = 2 * cos_M_;
+      size_links_upper_ip_ = maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
+      size_links_upper_cos_ = cos_maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
+      size_links_per_element_ = size_links_upper_ip_ + size_links_upper_cos_;
 
-      size_links_per_element_ = 2 * (maxM_ * sizeof(tableint) + sizeof(linklistsizeint));
+      size_links_level0_ip_ = maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
+      size_links_level0_cos_ = cos_maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
+
       size_links_level0_ = offsetData_;
       visitedlistpool = new VisitedListPool(1, maxelements_);
 

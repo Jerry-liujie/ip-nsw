@@ -262,6 +262,11 @@ int main(int argc, char** argv) {
         }
 		
         appr_alg = new hnswlib::HierarchicalNSW<float>(&l2space, vecsize, M, efConstruction);
+        
+        std::cout << "266 line upper_ip : " << appr_alg->size_links_upper_ip_ << std::endl;
+        std::cout << "267 line level0_ip : " << appr_alg->size_links_level0_ip_ << std::endl;
+        std::cout << "size_t size " << sizeof(size_t) << std::endl;
+
 
         appr_alg->elementNorms = std::move(element_norms);
         std::cout << "testing " << std::endl;
@@ -283,7 +288,7 @@ int main(int argc, char** argv) {
         // test if cos graph is correct   jie 0506
         /*
         for (int i = 0; i < 10; ++i) {
-          int *temp_data = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_ + appr_alg->size_links_level0_ / 2);
+          int *temp_data = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_ + appr_alg->size_links_level0_ip_);
           std::cout << "construction # links: " << *temp_data << std::endl;
         }
         */
@@ -426,7 +431,7 @@ int main(int argc, char** argv) {
 
         /*
         for (int i = 100000; i < 100010; ++i) {
-          int *temp_data = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_ + appr_alg->size_links_level0_ / 2);
+          int *temp_data = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_ + appr_alg->size_links_level0_ip_);
           std::cout << "number of links : " << *temp_data << std::endl;
         }
         */
@@ -521,7 +526,6 @@ int main(int argc, char** argv) {
             auto start = std::chrono::high_resolution_clock::now();
             for (int i = 0; i < qsize; i++) {
                 gt[i] = appr_alg->searchKnn(massQ + vecdim*i, topK);
-                // std::cout << "test 0505 : " << gt[i].size() << std::endl;
             }
             auto end = std::chrono::high_resolution_clock::now();
             // std::cout << "quality : " << appr_alg->quality_of_first_bot_bucket / qsize << std::endl;
