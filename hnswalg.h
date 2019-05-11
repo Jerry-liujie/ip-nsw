@@ -117,6 +117,8 @@ namespace hnswlib {
     size_t size_links_level0_cos_;
     size_t size_links_upper_ip_;
     size_t size_links_upper_cos_;
+    size_t dist_calc_cos;
+    size_t dist_calc_cos_base;
 
 
     VisitedListPool *visitedlistpool;
@@ -334,6 +336,8 @@ namespace hnswlib {
         dist_t dist = fstdistfunc_(datapoint, getDataByInternalId(*it), dist_func_param_);
         if (is_ip == 0) {
           dist = dist / elementNorms[getExternalLabel(*it)];
+          dist_calc_cos++;
+          dist_calc_cos_base++;
         }
         dist_calc++;
         topResults.emplace(dist, *it);
@@ -384,7 +388,11 @@ namespace hnswlib {
 
             char *currObj1 = (getDataByInternalId(tnum));
             dist_t dist = fstdistfunc_(datapoint, currObj1, dist_func_param_);
-            if (!is_ip) dist = dist / elementNorms[getExternalLabel(tnum)];
+            if (!is_ip) {
+                dist = dist / elementNorms[getExternalLabel(tnum)];
+                dist_calc_cos++;
+                dist_calc_cos_base++;
+            }
             dist_calc++;
             if (topResults.top().first > dist || topResults.size() < ef) {
               candidateSet.emplace(-dist, tnum);
@@ -458,10 +466,9 @@ namespace hnswlib {
 
         // for now we do not apply any pruning strategies to mips graph
         // we rely on cosgraph for pruning in the query phase
-        /*
-        if (!is_ip)
+        if (is_ip)
         {
-          float coeff = 1.0;
+          float coeff = 0.8;
           for (std::pair< dist_t, tableint> curen2 : returnlist) {
             dist_t curdist =
               fstdistfunc_(getDataByInternalId(curen2.second), getDataByInternalId(curen.second), dist_func_param_);;
@@ -472,7 +479,6 @@ namespace hnswlib {
             }
           }
         }
-        */
         if (good) {
           returnlist.push_back(curen);
         }
@@ -766,6 +772,7 @@ namespace hnswlib {
       dist_t curdist = fstdistfunc_(query_data, getDataByInternalId(enterpoint_node), dist_func_param_);
       dist_t cos_curdist = curdist / elementNorms[getExternalLabel(enterpoint_node)];
       dist_calc++;
+      dist_calc_cos++;
 
       // cosine search
       for (int level = maxlevel_; level > 0; level--) {
@@ -782,6 +789,7 @@ namespace hnswlib {
               throw runtime_error("cand error");
             dist_t d = fstdistfunc_(query_data, getDataByInternalId(cand), dist_func_param_) / elementNorms[getExternalLabel(cand)];
             dist_calc++;
+            dist_calc_cos++;
             if (d < cos_curdist) {
               cos_curdist = d;
               cos_currObj = cand;
@@ -821,7 +829,7 @@ namespace hnswlib {
       std::set<tableint> cos_ep_set, ep_set;
       cos_ep_set.insert(cos_currObj);
       // cos queue is hardcoded to 10 for the time being
-      std::priority_queue< std::pair< dist_t, tableint  >, vector<pair<dist_t, tableint>>, CompareByFirst> cos_topResults = searchBaseLayerST(cos_ep_set, query_data, 2, 0);
+      std::priority_queue< std::pair< dist_t, tableint  >, vector<pair<dist_t, tableint>>, CompareByFirst> cos_topResults = searchBaseLayerST(cos_ep_set, query_data, 1, 0);
       while (cos_topResults.size() > 0) {
         tableint *data = (tableint*)(data_level0_memory_ + cos_topResults.top().second * size_data_per_element_);
         tableint size = *data;

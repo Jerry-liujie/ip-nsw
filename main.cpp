@@ -472,26 +472,29 @@ int main(int argc, char** argv) {
         // ===================================================================
 
         // =========== very important here ========================================================================================================
-        /*
-        std::vector<int> external_count(appr_alg->maxelements_);
-        int *temp_data = NULL;
-        int degree_count = 0;
+        // std::vector<int> external_count(appr_alg->maxelements_);
+        int *temp_data1 = NULL;
+        int *temp_data2 = NULL;
+        int degree_count_ip = 0;
+        int degree_count_cos = 0;
         for (int i = 0; i < appr_alg->maxelements_; ++i) {
-            temp_data = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_);
-            int degree = *temp_data;
-            for (int j = 1; j <= degree; ++j) {
-                external_count[appr_alg->getExternalLabel(*(temp_data + j))]++;
-            }
-            degree_count += degree;
+            temp_data1 = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_);
+            temp_data2 = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_ + appr_alg->size_links_level0_ip_);
+            // int degree = *temp_data;
+            //for (int j = 1; j <= degree; ++j) {
+            //    external_count[appr_alg->getExternalLabel(*(temp_data + j))]++;
+            //}
+            degree_count_ip += *temp_data1;
+            degree_count_cos += *temp_data2;
             // std::cout << "norm : " << norm << ", degrees : " << degree  << std::endl;
             // std::cout << norm << ", " << degree  << std::endl;
         }
-        std::cout << "avg. degree = " << (float)degree_count / appr_alg->maxelements_  << std::endl;
-        for (int i = 0; i < appr_alg->maxelements_; ++i) {
-            float norm = appr_alg->elementNorms[appr_alg->getExternalLabel(i)];
-            std::cout << norm << ", " << external_count[appr_alg->getExternalLabel(i)] << std::endl;
-        }
-        */
+        std::cout << "avg. ip degree = " << (float)degree_count_ip / appr_alg->maxelements_  << std::endl;
+        std::cout << "avg. cos degree = " << (float)degree_count_cos / appr_alg->maxelements_  << std::endl;
+        //for (int i = 0; i < appr_alg->maxelements_; ++i) {
+        //    float norm = appr_alg->elementNorms[appr_alg->getExternalLabel(i)];
+        //    std::cout << norm << ", " << external_count[appr_alg->getExternalLabel(i)] << std::endl;
+        //}
         // ========================================================================================================================================
 
 
@@ -518,6 +521,8 @@ int main(int argc, char** argv) {
         for (int efSearch : efs) {
             appr_alg->setEf(efSearch);
             appr_alg->dist_calc = 0;
+            appr_alg->dist_calc_cos = 0;
+            appr_alg->dist_calc_cos_base = 0;
             std::ofstream fres;
             if (!outputname.empty()) {
                 fres.open(outputname);
@@ -582,8 +587,11 @@ int main(int argc, char** argv) {
             }
             std::cout << "ef : " << efSearch << ", ";
             std::cout << 1.0f * correct / total << ", ";
-            std::cout << "Average query time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << "ms, ";
+            std::cout << "Average query time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << " ms, ";
             std::cout << "dist_computations: " << appr_alg->dist_calc / (double)qsize << std::endl;
+            // std::cout << "cos dist_computations: " << appr_alg->dist_calc_cos / (double)qsize << std::endl;
+            // std::cout << "mips dist_computations: " << (appr_alg->dist_calc - appr_alg->dist_calc_cos) / (double)qsize << std::endl;
+            // std::cout << "cos base dist_computations: " << appr_alg->dist_calc_cos_base / (double)qsize << std::endl;
             // jie 2019-04-15 
             /*
             std::cout << "avg # of candidates : " << test_avg / (double)qsize << ", ";
