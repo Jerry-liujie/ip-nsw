@@ -455,10 +455,10 @@ int main(int argc, char** argv) {
             if (!outputname.empty()) {
                 fres.close();
             }
-            std::cout << "ef : " << efSearch << ", ";
+            std::cout << "ef, " << efSearch << ", ";
             std::cout << 1.0f * correct / total << ", ";
-            std::cout << "Average query time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << "ms, ";
-            std::cout << "dist_computations: " << appr_alg->dist_calc / (double)qsize << std::endl;
+            std::cout << "Average query time, " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << ", ";
+            std::cout << "dist_computations, " << appr_alg->dist_calc / (double)qsize << std::endl;
         }
         delete appr_alg;
         delete massQ;
