@@ -29,13 +29,15 @@ M=32
 prefix="/data/liujie/gqr/data/${dataset}"
 lshboxPath="${prefix}/${dataset}_top${topk}_product_groundtruth.lshbox"
 #lshboxPath="${prefix}/${dataset}_groundtruth.lshbox"
+###########################################
 basePath="${prefix}/${dataset}_base.fvecs"
 queryPath="${prefix}/${dataset}_query.fvecs"
+#########################################
 
-threshold=$2
+label=$2
 proj_dir="/data/liujie/ip-nsw/test-models"
-output_graph="${proj_dir}/${dataset}/${dataset}_out_graph_${M}_${efConstruction}.hnsw.${threshold}"
-log_file="${dataset}_log_${threshold}.txt"
+output_graph="${proj_dir}/${dataset}/${dataset}_out_graph_${M}_${efConstruction}.hnsw.${label}"
+log_file="logs/${dataset}_log_${label}.txt"
 
 
 #++++++++++++++++++++++++++++++++++

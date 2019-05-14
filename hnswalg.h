@@ -443,7 +443,7 @@ namespace hnswlib {
       visitedlistpool->releaseVisitedList(vl);
       return topResults;
     }
-    void getNeighborsByHeuristic2(std::priority_queue< std::pair< dist_t, tableint>> &topResults, const int NN, int is_ip)
+    void getNeighborsByHeuristic2(tableint cur_c, std::priority_queue< std::pair< dist_t, tableint>> &topResults, const int NN, int is_ip)
     {
       if (topResults.size() < NN) {
         return;
@@ -466,12 +466,27 @@ namespace hnswlib {
 
         // for now we do not apply any pruning strategies to mips graph
         // we rely on cosgraph for pruning in the query phase
-        if (is_ip)
+        if (!is_ip)
         {
-          float coeff = 0.8;
+          dist_to_query = dist_to_query / elementNorms[getExternalLabel(cur_c)];
+          // float coeff = 1;
           for (std::pair< dist_t, tableint> curen2 : returnlist) {
             dist_t curdist =
-              fstdistfunc_(getDataByInternalId(curen2.second), getDataByInternalId(curen.second), dist_func_param_);;
+              fstdistfunc_(getDataByInternalId(curen2.second), getDataByInternalId(curen.second), dist_func_param_)
+              / elementNorms[getExternalLabel(curen.second)] / elementNorms[getExternalLabel(curen2.second)];
+            // coeff * curdist < dist_to_query, we can adjust the coefficient here to get different performance
+            if (curdist < dist_to_query) {
+              good = false;
+              break;
+            }
+          }
+        }
+        else
+        {
+          float coeff = 0.7;
+          for (std::pair< dist_t, tableint> curen2 : returnlist) {
+            dist_t curdist =
+              fstdistfunc_(getDataByInternalId(curen2.second), getDataByInternalId(curen.second), dist_func_param_);
             // coeff * curdist < dist_to_query, we can adjust the coefficient here to get different performance
             if (coeff * curdist < dist_to_query) {
               good = false;
@@ -505,7 +520,7 @@ namespace hnswlib {
 
       size_t num_links = is_ip ? M_ : cos_M_;
 
-      getNeighborsByHeuristic2(topResults, num_links, is_ip);
+      getNeighborsByHeuristic2(cur_c, topResults, num_links, is_ip);
       while (topResults.size() > num_links) {
         throw exception();
         topResults.pop();
@@ -602,7 +617,7 @@ namespace hnswlib {
             candidates.emplace(tmp_dist, data[j]);
           }
 
-          getNeighborsByHeuristic2(candidates, Mcurmax, is_ip);
+          getNeighborsByHeuristic2(rez[idx], candidates, Mcurmax, is_ip);
 
           int indx = 0;
           while (candidates.size() > 0) {
@@ -644,6 +659,7 @@ namespace hnswlib {
         };
         cur_c = cur_element_count;
         cur_element_count++;
+        if (cur_element_count % 100000 == 0) std::cout << "count : " << cur_element_count << std::endl;
       }
       unique_lock<mutex> lock_el(ll_locks[cur_c]);
       int curlevel = getRandomLevel(mult_);
