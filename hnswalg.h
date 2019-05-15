@@ -773,10 +773,10 @@ namespace hnswlib {
 
 
       // here I set cos_ef_ to cos_M_
-      std::priority_queue<std::pair< dist_t, tableint>> topResults = searchBaseLayerST(currObj, query_data, cos_M_);
+      std::priority_queue<std::pair< dist_t, tableint>> topResults = searchBaseLayerST(currObj, query_data, 2);
             
       vector<pair<dist_t, tableint>> cos_res;
-      cos_res.reserve(cos_M_);
+      // cos_res.reserve(cos_M_);
       while (topResults.size() > 0) {
         tableint tmp_id = topResults.top().second;
         dist_t tmp_ip = topResults.top().first * elementNorms[getExternalLabel(tmp_id)];
@@ -917,7 +917,7 @@ namespace hnswlib {
       size_links_level0_cos_ = cos_maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
       size_links_level0_ = offsetData_;
 
-      size_links_per_element_ = maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
+      size_links_per_element_ = cos_maxM_ * sizeof(tableint) + sizeof(linklistsizeint);
 
       visitedlistpool = new VisitedListPool(1, maxelements_);
 
