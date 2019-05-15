@@ -245,7 +245,24 @@ int main(int argc, char** argv) {
         float *mass = NULL;
         size_t datadim = loadFvecs(mass, vecsize, dataname);
 
-        appr_alg = new hnswlib::HierarchicalNSW<float>(&l2space, vecsize, M, efConstruction);
+        std::vector<float> element_norms;
+        element_norms.reserve(vecsize);
+        for (size_t i = 0; i < vecsize; ++i) {
+            float line_norm = 0;
+            for (size_t j = 0; j < vecdim; ++j) {
+                float ele = mass[i * vecdim + j];
+                line_norm += ele * ele;
+            }
+            line_norm = sqrt(line_norm);
+            element_norms.push_back(line_norm);
+        }
+
+        appr_alg = new hnswlib::HierarchicalNSW<float>(&l2space, vecsize, M, 10, efConstruction, 100);
+
+        appr_alg->elementNorms = std::move(element_norms);
+        for (int i = 0; i < 3; ++i) {
+            std::cout << appr_alg->elementNorms[i] << std::endl;
+        }
 
         std::cout << "Building index\n";
         double t1 = omp_get_wtime();
