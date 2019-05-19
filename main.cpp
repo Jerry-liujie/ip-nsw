@@ -27,7 +27,7 @@ int loadFvecs(float*& data, int numItems, std::string inputPath) {
     }
     int dimension;
     fin.read((char*)&dimension, 4);
-    data = new float[numItems* dimension];
+    data = new float[numItems* (size_t)dimension];
     fin.read((char*)data, sizeof(float) * dimension);
 
     int dim;
