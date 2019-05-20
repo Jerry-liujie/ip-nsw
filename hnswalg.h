@@ -773,7 +773,8 @@ namespace hnswlib {
 
 
       // here I set cos_ef_ to cos_M_
-      std::priority_queue<std::pair< dist_t, tableint>> topResults = searchBaseLayerST(currObj, query_data, 2);
+      // zzzzz
+      std::priority_queue<std::pair< dist_t, tableint>> topResults = searchBaseLayerST(currObj, query_data, 1);
             
       vector<pair<dist_t, tableint>> cos_res;
       // cos_res.reserve(cos_M_);
