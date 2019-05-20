@@ -290,7 +290,7 @@ namespace hnswlib {
           dist_t curdist =
             fstdistfunc_(getDataByInternalId(curen2.second), getDataByInternalId(curen.second), dist_func_param_);;
           // coeff * curdist < dist_to_query, we can adjust the coefficient here to get different performance
-          if (0.7 * curdist < dist_to_query) {
+          if (curdist < dist_to_query) {
             good = false;
             break;
           }
