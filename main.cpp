@@ -402,7 +402,43 @@ int main(int argc, char** argv) {
 
         appr_alg = new hnswlib::HierarchicalNSW<float>(&l2space, graphname.data(), false);
 
+        // =========== very important here ========================================================================================================
+        // std::vector<int> external_count(appr_alg->maxelements_);
+        int *temp_data1 = NULL;
+        int *temp_data2 = NULL;
+        int degree_count_ip = 0;
+        int degree_count_cos = 0;
+        float norm_avg = 0, norm_var = 0;
+        for (int i = 0; i < appr_alg->maxelements_; ++i) {
+            temp_data1 = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_);
+            temp_data2 = (int *)(appr_alg->data_level0_memory_ + i * appr_alg->size_data_per_element_ + appr_alg->size_links_level0_ip_);
+            // int degree = *temp_data;
+            //for (int j = 1; j <= degree; ++j) {
+            //    external_count[appr_alg->getExternalLabel(*(temp_data + j))]++;
+            //}
+            degree_count_ip += *temp_data1;
+            degree_count_cos += *temp_data2;
+            norm_avg += appr_alg->elementNorms[i];
+            // std::cout << "norm : " << norm << ", degrees : " << degree  << std::endl;
+            // std::cout << norm << ", " << degree  << std::endl;
+        }
+        norm_avg /= appr_alg->maxelements_;
+        for (int i = 0; i < appr_alg->maxelements_; ++i) {
+            norm_var += (appr_alg->elementNorms[i] - norm_avg) * (appr_alg->elementNorms[i] - norm_avg);
+        }
+        norm_var /= appr_alg->maxelements_;
+        std::cout << "avg. ip degree = " << (float)degree_count_ip / appr_alg->maxelements_  << std::endl;
+        std::cout << "avg. cos degree = " << (float)degree_count_cos / appr_alg->maxelements_  << std::endl;
+        std::cout << "norm avg. = " << norm_avg << std::endl;
+        std::cout << "norm sd. = " << sqrt(norm_var) << std::endl;
+        //for (int i = 0; i < appr_alg->maxelements_; ++i) {
+        //    float norm = appr_alg->elementNorms[appr_alg->getExternalLabel(i)];
+        //    std::cout << norm << ", " << external_count[appr_alg->getExternalLabel(i)] << std::endl;
+        //}
+        // ========================================================================================================================================
+
         std::cout << "max level : " << appr_alg->maxlevel_ << std::endl;
+        std::cout << "ef, " << "recall, " << " query_time, " << "dist_comp" << std::endl;
         std::vector<int> efs;
         for (int i = 10; i < 100; i+=10) {
             efs.push_back(i);
@@ -472,10 +508,10 @@ int main(int argc, char** argv) {
             if (!outputname.empty()) {
                 fres.close();
             }
-            std::cout << "ef, " << efSearch << ", ";
+            std::cout << efSearch << ", ";
             std::cout << 1.0f * correct / total << ", ";
-            std::cout << "Average query time, " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << ", ";
-            std::cout << "dist_computations, " << appr_alg->dist_calc / (double)qsize << std::endl;
+            std::cout << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() / (double)qsize << ", ";
+            std::cout << appr_alg->dist_calc / (double)qsize << std::endl;
         }
         delete appr_alg;
         delete massQ;
