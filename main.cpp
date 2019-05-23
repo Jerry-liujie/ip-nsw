@@ -10,6 +10,7 @@
 #include "hnswlib.h"
 #include <algorithm>
 #include <ctime>
+#include <cassert>
 #include <omp.h>
 
 

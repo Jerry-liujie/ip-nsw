@@ -430,6 +430,7 @@ namespace hnswlib {
         };
         cur_c = cur_element_count;
         cur_element_count++;
+        if (cur_element_count % 100000 == 0) cout << "count : " << cur_element_count << endl;
       }
       unique_lock<mutex> lock_el(ll_locks[cur_c]);
       int curlevel = getRandomLevel(mult_);
