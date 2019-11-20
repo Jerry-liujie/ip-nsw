@@ -18,6 +18,8 @@ const int defaultEfConstruction = 1024;
 const int defaultEfSearch = 128;
 const int defaultM = 32;
 const int defaultTopK = 10;
+const int defaultCosEfConstruction = 100;
+const int defaultCosM = 10;
 
 
 int loadFvecs(float*& data, int numItems, std::string inputPath) {
@@ -28,14 +30,15 @@ int loadFvecs(float*& data, int numItems, std::string inputPath) {
     }
     int dimension;
     fin.read((char*)&dimension, 4);
-    data = new float[numItems* (size_t)dimension];
+    data = new float[numItems * (uint64_t)dimension];
     fin.read((char*)data, sizeof(float) * dimension);
 
     int dim;
     for (int i = 1; i < numItems; ++i) {
+        //cout << i << "\t";
         fin.read((char*)&dim, 4);
         assert(dim == dimension);
-        fin.read((char*)(data + i * dimension), sizeof(float) * dimension);
+        fin.read((char*)(data + i * (uint64_t)dimension), sizeof(float) * dimension);
     }
     fin.close();
     return dimension;
@@ -115,6 +118,8 @@ int main(int argc, char** argv) {
     int efConstruction = defaultEfConstruction;
     int efSearch = defaultEfSearch;
     int M = defaultM;
+    int cos_efConstruction = defaultCosEfConstruction;
+    int cos_M = defaultCosM;
     int vecsize = -1;
     int qsize = -1;
     int vecdim = -1;
@@ -238,6 +243,28 @@ int main(int argc, char** argv) {
             }
         }
         std::cout << "M: " << M << std::endl;
+    
+        for (int i = 1; i < argc - 1; i++) {
+            if (std::string(argv[i]) == "--cos_efConstruction") {
+                if (sscanf(argv[i + 1], "%d", &cos_efConstruction) != 1 || cos_efConstruction <= 0) {
+                    printError("Inappropriate value for cos_efConstruction: \"" + std::string(argv[i + 1]) + "\"");
+                    return 0;
+                }
+                break;
+            }
+        }
+        std::cout << "cos_efConstruction: " << cos_efConstruction << std::endl;
+        
+        for (int i = 1; i < argc - 1; i++) {
+            if (std::string(argv[i]) == "--cos_M") {
+                if (sscanf(argv[i + 1], "%d", &cos_M) != 1 || cos_M <= 0) {
+                    printError("Inappropriate value for cos_M: \"" + std::string(argv[i + 1]) + "\"");
+                    return 0;
+                }
+                break;
+            }
+        }
+        std::cout << "cos_M: " << cos_M << std::endl;
     
 
 
