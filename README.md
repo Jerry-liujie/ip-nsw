@@ -15,14 +15,17 @@ And this repo is modified from [https://github.com/stanis-morozov/ip-nsw](https:
 ## Compilation
 To download and compile the code type:
 ```
-$ git clone https://github.com/stanis-morozov/ip-nsw.git
+$ git clone https://github.com/Jerry-liujie/ip-nsw.git
 $ cd ip-nsw
-$ cmake CMakeLists.txt
+$ git checkout --track origin/GraphMIPS
+$ mkdir build && cd build
+$ cmake ..
 $ make
 ```
 ## Dataset
-The details of dataset are to be added.
-```
+netflix, yahoomusic and imagenet can be found here: http://www.cse.cuhk.edu.hk/systems/hash/gqr/datasets.html
+We will add word2vec dataset asap.
+
 
 ## Run experiments
 ```
@@ -54,8 +57,4 @@ Query mode supports the following options:
   --topK            Top size for retrieval. Default: 1
   --output          Filename to print the result. Default: stdout
 ```
-```
 
-## Related publication
-```
-```
