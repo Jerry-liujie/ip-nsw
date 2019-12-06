@@ -20,6 +20,7 @@ const int defaultM = 32;
 const int defaultTopK = 10;
 const int defaultCosEfConstruction = 100;
 const int defaultCosM = 10;
+const int defaultCosEfSearch = 1;
 
 
 int loadFvecs(float*& data, int numItems, std::string inputPath) {
@@ -120,6 +121,7 @@ int main(int argc, char** argv) {
     int M = defaultM;
     int cos_efConstruction = defaultCosEfConstruction;
     int cos_M = defaultCosM;
+    int cos_efSearch = defaultCosEfSearch;
     int vecsize = -1;
     int qsize = -1;
     int vecdim = -1;
@@ -243,7 +245,7 @@ int main(int argc, char** argv) {
             }
         }
         std::cout << "M: " << M << std::endl;
-    
+
         for (int i = 1; i < argc - 1; i++) {
             if (std::string(argv[i]) == "--cos_efConstruction") {
                 if (sscanf(argv[i + 1], "%d", &cos_efConstruction) != 1 || cos_efConstruction <= 0) {
@@ -254,7 +256,7 @@ int main(int argc, char** argv) {
             }
         }
         std::cout << "cos_efConstruction: " << cos_efConstruction << std::endl;
-        
+
         for (int i = 1; i < argc - 1; i++) {
             if (std::string(argv[i]) == "--cos_M") {
                 if (sscanf(argv[i + 1], "%d", &cos_M) != 1 || cos_M <= 0) {
@@ -265,10 +267,10 @@ int main(int argc, char** argv) {
             }
         }
         std::cout << "cos_M: " << cos_M << std::endl;
-    
 
 
-       
+
+
         hnswlib::L2Space l2space(vecdim);
         float *mass = NULL;
         size_t datadim = loadFvecs(mass, vecsize, dataname);
@@ -387,7 +389,20 @@ int main(int argc, char** argv) {
             }
         }
         std::cout << "efSearch: " << efSearch << std::endl;
-        
+
+
+        for (int i = 1; i < argc - 1; i++) {
+            if (std::string(argv[i]) == "--cos_efSearch") {
+                if (sscanf(argv[i + 1], "%d", &cos_efSearch) != 1 || cos_efSearch <= 0) {
+                    printError("Inappropriate value for cos_efSearch: \"" + std::string(argv[i + 1]) + "\"");
+                    return 0;
+                }
+                break;
+            }
+        }
+        std::cout << "cos_efSearch: " << cos_efSearch << std::endl;
+
+
         for (int i = 1; i < argc - 1; i++) {
             if (std::string(argv[i]) == "--topK") {
                 if (sscanf(argv[i + 1], "%d", &topK) != 1 || topK <= 0) {
@@ -482,6 +497,8 @@ int main(int argc, char** argv) {
         //for (int i = 20000; i < 100000; i += 20000) {
         //    efs.push_back(i);
         //}
+
+        appr_alg->setCosEf(cos_efSearch);
 
         for (int efSearch : efs) {
             appr_alg->setEf(efSearch);

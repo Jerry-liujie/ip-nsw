@@ -51,6 +51,7 @@ namespace hnswlib {
       cos_maxM_ = cos_M_;
       cos_maxM0_ = cos_M_ * 2;
       cos_efConstruction_ = cos_efConstruction;
+      cos_ef_ = 1;
 
 
       size_links_level0_ip_ = maxM0_ * sizeof(tableint) + sizeof(linklistsizeint);
@@ -106,7 +107,7 @@ namespace hnswlib {
 
     size_t cos_M_, cos_maxM_, cos_maxM0_;
     size_t cos_efConstruction_;
-
+    size_t cos_ef_;
 
     VisitedListPool *visitedlistpool;
     mutex cur_element_count_guard_;
@@ -637,6 +638,11 @@ namespace hnswlib {
     void setEf(size_t ef) {
       ef_ = ef;
     }
+
+    void setCosEf(size_t cos_ef) {
+      cos_ef_ = cos_ef;
+    }
+
     void addPoint(void *datapoint, labeltype label, int level = -1) {
 
       tableint cur_c = 0;
@@ -774,7 +780,7 @@ namespace hnswlib {
 
       // here I set cos_ef_ to cos_M_
       // zzzzz
-      std::priority_queue<std::pair< dist_t, tableint>> topResults = searchBaseLayerST(currObj, query_data, 1);
+      std::priority_queue<std::pair< dist_t, tableint>> topResults = searchBaseLayerST(currObj, query_data, cos_ef_);
             
       vector<pair<dist_t, tableint>> cos_res;
       // cos_res.reserve(cos_M_);
