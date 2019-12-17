@@ -1,10 +1,15 @@
 # construction phase: ./run.sh 0
 # search phase: ./run.sh 1
 
-vecsize=136736
-vecdim=300
-dataset="yahoomusic"
-qsize=1000
+vecsize=53387
+vecdim=192
+dataset="audio"
+qsize=200
+
+#vecsize=136736
+#vecdim=300
+#dataset="yahoomusic"
+#qsize=1000
 
 #vecsize=1000000
 #vecdim=100
