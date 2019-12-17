@@ -2,7 +2,7 @@
 
 This is the implementation for ```ip-nsw+``` from the following paper:
 
-Jie Liu*, Xiao Yan*, Xinyan Dai, Zhirong Li, James Cheng, Ming-Chang Yang. [Understanding and Improving Proximity Graph based Maximum Inner Product Search](arxiv.org/abs/1909.13459). AAAI Conference on Artificial Intelligence (AAAI), 2020.
+Jie Liu*, Xiao Yan*, Xinyan Dai, Zhirong Li, James Cheng, Ming-Chang Yang. [Understanding and Improving Proximity Graph based Maximum Inner Product Search](https://arxiv.org/abs/1909.13459). AAAI Conference on Artificial Intelligence (AAAI), 2020.
 
 Acknowledgement: This work improves graph-based MIPS method based on the following work: S. Morozov, A. Babenko. Non-metric Similarity Graphs for Maximum Inner Product Search. Advances in Neural Information Processing Systems 32 (NIPS 2018).
 
@@ -50,7 +50,7 @@ Query mode supports the following options:
   --querySize           Number of queries
   --dimension           Dimension of vectors
   --benchmark           Groundtruth top-K results for query. 
-                        You can refer to [GQR project](github.com/lijif2/gqr) for the details of obtaining benchmark.
+                        You can refer to [GQR project](https://github.com/lijif2/gqr) for the details of obtaining benchmark.
                         Should use cal_groundtruth.sh in gqr/script folder
   --inputGraph          Filename for the input index graph
   --efSearch            efSearch parameter in MIPS graph. Default: 128
