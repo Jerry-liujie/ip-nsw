@@ -1,8 +1,8 @@
-# Non-metric Similarity Graphs for Maximum Inner Product Search
+# Understanding and Improving Proximity Graph based Maximum Inner Product Search (AAAI-20)
 
 This is the implementation for ```ip-nsw+``` from the following paper:
 
-Jie Liu*, Xiao Yan*, Xinyan Dai, Zhirong Li, James Cheng, Ming-Chang Yang. AAAI Conference on Artificial Intelligence (AAAI), 2020.
+Jie Liu*, Xiao Yan*, Xinyan Dai, Zhirong Li, James Cheng, Ming-Chang Yang. Understanding and Improving Proximity Graph based Maximum Inner Product Search. AAAI Conference on Artificial Intelligence (AAAI), 2020.
 
 Acknowledgement: This work improves graph-based MIPS method based on the following work: S. Morozov, A. Babenko. Non-metric Similarity Graphs for Maximum Inner Product Search. Advances in Neural Information Processing Systems 32 (NIPS 2018).
 
