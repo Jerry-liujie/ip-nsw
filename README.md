@@ -23,8 +23,7 @@ $ cmake ..
 $ make
 ```
 ## Dataset
-Yahoo!Music and ImageNet can be found here: http://www.cse.cuhk.edu.hk/systems/hash/gqr/datasets.html
-We will add word2vec dataset asap.
+Yahoo!Music,word2vec and ImageNet can be found here: http://www.cse.cuhk.edu.hk/systems/hash/gqr/datasets.html
 
 ## Run experiments
 ```
